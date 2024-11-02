@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 14
+    commands:
+      - echo Installing NPM dependencies...
+      - npm install
+  pre_build:
+    commands:
+      - echo Pre-build phase
+  build:
+    commands:
+      - echo Build phase
+  post_build:
+    commands:
+      - echo Build completed on 'date'
+
+artifacts:
+  files:
+    - '**/*'    # Inclui todos os arquivos e subpastas recursivamente
