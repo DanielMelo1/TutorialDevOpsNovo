@@ -1,4 +1,5 @@
-version: 0.2
+version: 0.0
+
 os: linux
 
 files:
@@ -10,7 +11,7 @@ hooks:
     - location: scripts/clean_up.sh
       timeout: 300
       runas: root
-
+      
   AfterInstall:
     - location: scripts/start_server.sh
       timeout: 300
