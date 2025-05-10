@@ -184,9 +184,35 @@ resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
   role = aws_iam_role.ec2_codedeploy_role.name
 }
 
+# Buscar dinamicamente a AMI do Amazon Linux 2023
+data "aws_ami" "amazon_linux_2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023*-kernel-6.1-x86_64"]
+  }
+
+  filter {
+    name   = "description"
+    values = ["Amazon Linux 2023 AMI*"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+  
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = "ami-0f88e0871fd81e91"  # AMI exata da professora
+  ami                    = data.aws_ami.amazon_linux_2023.id  # Busca dinamicamente
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
@@ -252,4 +278,9 @@ output "ssh_connection_command" {
 output "web_url" {
   value = "http://${aws_instance.lab_ec2.public_ip}"
   description = "URL para acessar a página web"
+}
+
+output "selected_ami" {
+  value = data.aws_ami.amazon_linux_2023.id
+  description = "AMI selecionada pela busca dinâmica"
 }
