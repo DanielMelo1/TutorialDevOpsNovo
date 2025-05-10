@@ -150,6 +150,27 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
+# Buscar dinamicamente a AMI do Amazon Linux 2023
+data "aws_ami" "amazon_linux_2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+  
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
 # IAM Role para CodeDeploy
 resource "aws_iam_role" "ec2_codedeploy_role" {
   name = "EC2CodeDeployRole"
@@ -186,14 +207,14 @@ resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
 
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = "ami-0c72b54b3b81afe31"  # AMI de Amazon Linux 2023 correta
+  ami                    = data.aws_ami.amazon_linux_2023.id  # Busca dinamicamente
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
-  key_name               = "key"  # Sua chave existente sem .pem
+  key_name               = "key"  # Sua chave existente
   
-  # User data sem Instance Connect (deve vir pré-instalado na AMI)
+  # User data para Amazon Linux 2023
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
@@ -216,7 +237,7 @@ resource "aws_instance" "lab_ec2" {
               systemctl enable codedeploy-agent
               systemctl start codedeploy-agent
               
-              # Confirmar instalações no log
+              # Log as instalações
               echo "=== LOG DE INSTALAÇÃO ===" >> /var/log/user-data.log
               echo "Instalações completadas em $(date)" >> /var/log/user-data.log
               echo "Node version: $(node --version)" >> /var/log/user-data.log
@@ -240,4 +261,9 @@ output "ec2_public_ip" {
 
 output "ssh_connection_command" {
   value = "ssh -i key.pem ec2-user@${aws_instance.lab_ec2.public_ip}"
+}
+
+output "selected_ami" {
+  value = data.aws_ami.amazon_linux_2023.id
+  description = "AMI selecionada para a instância"
 }
