@@ -173,17 +173,19 @@ resource "aws_instance" "lab_ec2" {
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   
-  # User data para instalar um servidor web básico e preparar o ambiente
+  # User data para instalar um servidor web básico e Node.js
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              # Habilitar o repositório nodejs via amazon-linux-extras
-              amazon-linux-extras install nodejs14 -y 
+              # Não usar amazon-linux-extras porque nodejs não está mais disponível
+              # Usar NodeSource Repository
+              curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+              yum install -y nodejs
               # Instalar Apache
               yum install -y httpd
               systemctl start httpd
               systemctl enable httpd
-              echo "<h1>Hello from EC2 in lab-vpc!</h1>" > /var/www/html/index.html
+              echo "<h1>Hello from EC2 in lab-vpc! Node: $(node --version)</h1>" > /var/www/html/index.html
               EOF
 
   tags = {
