@@ -184,7 +184,7 @@ resource "aws_instance" "lab_ec2" {
               EOF
 
   tags = {
-    Name = "lab-ec2-instance"
+    Name = "labServer"
   }
 }
 
