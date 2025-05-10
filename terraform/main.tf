@@ -150,14 +150,14 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-# Buscar a AMI do Amazon Linux 2023 mais recente
-data "aws_ami" "amazon_linux_2023" {
+# Buscar a AMI do Amazon Linux 2 mais recente
+data "aws_ami" "amazon_linux_2" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
   }
 
   filter {
@@ -202,28 +202,29 @@ resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
 
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = data.aws_ami.amazon_linux_2023.id
+  ami                    = data.aws_ami.amazon_linux_2.id
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
   
-  # User data para Amazon Linux 2023
+  # User data para Amazon Linux 2 com Node.js 16
   user_data = <<-EOF
               #!/bin/bash
-              dnf update -y
+              yum update -y
               
-              # No Amazon Linux 2023, nodejs está disponível direto
-              dnf install -y nodejs
+              # Usar Node.js 16 que é compatível com Amazon Linux 2
+              curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -
+              yum install -y nodejs
               
               # Instalar Apache
-              dnf install -y httpd
+              yum install -y httpd
               systemctl start httpd
               systemctl enable httpd
               echo "<h1>Hello from EC2 in lab-vpc! Node: $(node --version)</h1>" > /var/www/html/index.html
               
               # Instalar CodeDeploy Agent
-              dnf install -y ruby wget
+              yum install -y ruby wget
               cd /home/ec2-user
               wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
               chmod +x ./install
@@ -232,7 +233,7 @@ resource "aws_instance" "lab_ec2" {
               # Confirmar instalações no log
               echo "Instalações completadas:" >> /var/log/user-data.log
               echo "Node version: $(node --version)" >> /var/log/user-data.log
-              echo "CodeDeploy agent status: $(systemctl status codedeploy-agent --no-pager)" >> /var/log/user-data.log
+              echo "CodeDeploy agent status: $(service codedeploy-agent status)" >> /var/log/user-data.log
               EOF
 
   tags = {
