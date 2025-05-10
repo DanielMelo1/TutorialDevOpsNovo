@@ -150,27 +150,6 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-# Buscar dinamicamente a AMI do Amazon Linux 2023
-data "aws_ami" "amazon_linux_2023" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*"]
-  }
-
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-  
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-}
-
 # IAM Role para CodeDeploy
 resource "aws_iam_role" "ec2_codedeploy_role" {
   name = "EC2CodeDeployRole"
@@ -207,17 +186,22 @@ resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
 
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = data.aws_ami.amazon_linux_2023.id  # Busca dinamicamente
+  ami                    = "ami-0f88e0871fd81e91"  # AMI exata da professora
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
   key_name               = "key"  # Sua chave existente
   
-  # User data para Amazon Linux 2023
+  # User data para Amazon Linux 2023 com Instance Connect
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
+              
+              # Instalar EC2 Instance Connect para funcionar no console AWS
+              dnf install -y ec2-instance-connect
+              systemctl enable ec2-instance-connect
+              systemctl start ec2-instance-connect
               
               # No Amazon Linux 2023, nodejs está disponível direto
               dnf install -y nodejs
@@ -237,11 +221,13 @@ resource "aws_instance" "lab_ec2" {
               systemctl enable codedeploy-agent
               systemctl start codedeploy-agent
               
-              # Log as instalações
+              # Log completo das instalações
               echo "=== LOG DE INSTALAÇÃO ===" >> /var/log/user-data.log
-              echo "Instalações completadas em $(date)" >> /var/log/user-data.log
+              echo "Data e hora: $(date)" >> /var/log/user-data.log
+              echo "Instance Connect: INSTALADO" >> /var/log/user-data.log
               echo "Node version: $(node --version)" >> /var/log/user-data.log
-              echo "CodeDeploy agent status: $(systemctl status codedeploy-agent --no-pager)" >> /var/log/user-data.log
+              echo "Apache: $(systemctl is-active httpd)" >> /var/log/user-data.log
+              echo "CodeDeploy agent: $(systemctl is-active codedeploy-agent)" >> /var/log/user-data.log
               echo "=========================" >> /var/log/user-data.log
               EOF
 
@@ -263,7 +249,7 @@ output "ssh_connection_command" {
   value = "ssh -i key.pem ec2-user@${aws_instance.lab_ec2.public_ip}"
 }
 
-output "selected_ami" {
-  value = data.aws_ami.amazon_linux_2023.id
-  description = "AMI selecionada para a instância"
+output "web_url" {
+  value = "http://${aws_instance.lab_ec2.public_ip}"
+  description = "URL para acessar a página web"
 }
