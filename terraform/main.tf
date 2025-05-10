@@ -150,6 +150,32 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
+# Buscar dinamicamente a AMI do Amazon Linux 2023
+data "aws_ami" "amazon_linux_2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023*-kernel-6.1-x86_64"]
+  }
+
+  filter {
+    name   = "description"
+    values = ["Amazon Linux 2023 AMI*"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+  
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
 # IAM Role para CodeDeploy
 resource "aws_iam_role" "ec2_codedeploy_role" {
   name = "EC2CodeDeployRole"
@@ -184,61 +210,32 @@ resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
   role = aws_iam_role.ec2_codedeploy_role.name
 }
 
-# Buscar dinamicamente a AMI do Amazon Linux 2023
-data "aws_ami" "amazon_linux_2023" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023*-kernel-6.1-x86_64"]
-  }
-
-  filter {
-    name   = "description"
-    values = ["Amazon Linux 2023 AMI*"]
-  }
-
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-  
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-}
-
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = data.aws_ami.amazon_linux_2023.id  # Busca dinamicamente
+  ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
   key_name               = "key"  # Sua chave existente
   
-  # User data para Amazon Linux 2023 com Instance Connect
+  # User data SEM Node.js - para instalação manual
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
               
-              # Instalar EC2 Instance Connect para funcionar no console AWS
+              # Instalar EC2 Instance Connect
               dnf install -y ec2-instance-connect
               systemctl enable ec2-instance-connect
               systemctl start ec2-instance-connect
-              
-              # No Amazon Linux 2023, nodejs está disponível direto
-              dnf install -y nodejs
               
               # Instalar Apache
               dnf install -y httpd
               systemctl start httpd
               systemctl enable httpd
-              echo "<h1>Hello from EC2 in lab-vpc! Node: $(node --version)</h1>" > /var/www/html/index.html
+              echo "<h1>Hello from EC2 in lab-vpc!</h1>" > /var/www/html/index.html
               
-              # Instalar CodeDeploy Agent
+              # Instalar apenas as dependências do CodeDeploy
               dnf install -y ruby wget
               cd /home/ec2-user
               wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
@@ -247,13 +244,13 @@ resource "aws_instance" "lab_ec2" {
               systemctl enable codedeploy-agent
               systemctl start codedeploy-agent
               
-              # Log completo das instalações
+              # Log sem Node.js
               echo "=== LOG DE INSTALAÇÃO ===" >> /var/log/user-data.log
               echo "Data e hora: $(date)" >> /var/log/user-data.log
               echo "Instance Connect: INSTALADO" >> /var/log/user-data.log
-              echo "Node version: $(node --version)" >> /var/log/user-data.log
               echo "Apache: $(systemctl is-active httpd)" >> /var/log/user-data.log
               echo "CodeDeploy agent: $(systemctl is-active codedeploy-agent)" >> /var/log/user-data.log
+              echo "Node.js: NÃO INSTALADO - para instalação manual" >> /var/log/user-data.log
               echo "=========================" >> /var/log/user-data.log
               EOF
 
@@ -282,5 +279,5 @@ output "web_url" {
 
 output "selected_ami" {
   value = data.aws_ami.amazon_linux_2023.id
-  description = "AMI selecionada pela busca dinâmica"
+  description = "AMI selecionada"
 }
