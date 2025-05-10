@@ -150,14 +150,14 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-# Buscar a AMI do Amazon Linux 2 mais recente
-data "aws_ami" "amazon_linux_2" {
+# Buscar a AMI do Amazon Linux 2023
+data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-*-x86_64"]
   }
 
   filter {
@@ -166,7 +166,7 @@ data "aws_ami" "amazon_linux_2" {
   }
 }
 
-# IAM Role para CodeDeploy (se necessário)
+# IAM Role para CodeDeploy
 resource "aws_iam_role" "ec2_codedeploy_role" {
   name = "EC2CodeDeployRole"
 
@@ -188,7 +188,7 @@ resource "aws_iam_role" "ec2_codedeploy_role" {
   }
 }
 
-# Política para acessar S3 (necessário para CodeDeploy)
+# Política para acessar S3
 resource "aws_iam_role_policy_attachment" "s3_readonly_policy" {
   role       = aws_iam_role.ec2_codedeploy_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
@@ -202,38 +202,38 @@ resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
 
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = data.aws_ami.amazon_linux_2.id
+  ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
+  key_name               = "key"  # Sua chave existente sem .pem
   
-  # User data para Amazon Linux 2 com Node.js 16
+  # User data para Amazon Linux 2023
   user_data = <<-EOF
               #!/bin/bash
-              yum update -y
+              dnf update -y
               
-              # Usar Node.js 16 que é compatível com Amazon Linux 2
-              curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -
-              yum install -y nodejs
+              # No Amazon Linux 2023, nodejs está disponível direto
+              dnf install -y nodejs
               
               # Instalar Apache
-              yum install -y httpd
+              dnf install -y httpd
               systemctl start httpd
               systemctl enable httpd
               echo "<h1>Hello from EC2 in lab-vpc! Node: $(node --version)</h1>" > /var/www/html/index.html
               
               # Instalar CodeDeploy Agent
-              yum install -y ruby wget
+              dnf install -y ruby wget
               cd /home/ec2-user
               wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
               chmod +x ./install
               ./install auto
               
               # Confirmar instalações no log
-              echo "Instalações completadas:" >> /var/log/user-data.log
+              echo "Instalações completadas em $(date)" >> /var/log/user-data.log
               echo "Node version: $(node --version)" >> /var/log/user-data.log
-              echo "CodeDeploy agent status: $(service codedeploy-agent status)" >> /var/log/user-data.log
+              echo "CodeDeploy agent status: $(systemctl status codedeploy-agent --no-pager)" >> /var/log/user-data.log
               EOF
 
   tags = {
@@ -241,38 +241,15 @@ resource "aws_instance" "lab_ec2" {
   }
 }
 
-# Outputs para facilitar a identificação dos recursos
+# Outputs
 output "vpc_id" {
-  value       = aws_vpc.lab_vpc.id
-  description = "ID da VPC"
-}
-
-output "public_subnet_1_id" {
-  value       = aws_subnet.public_1.id
-  description = "ID da sub-rede pública 1"
-}
-
-output "public_subnet_2_id" {
-  value       = aws_subnet.public_2.id
-  description = "ID da sub-rede pública 2"
-}
-
-output "private_subnet_1_id" {
-  value       = aws_subnet.private_1.id
-  description = "ID da sub-rede privada 1"
-}
-
-output "private_subnet_2_id" {
-  value       = aws_subnet.private_2.id
-  description = "ID da sub-rede privada 2"
+  value = aws_vpc.lab_vpc.id
 }
 
 output "ec2_public_ip" {
-  value       = aws_instance.lab_ec2.public_ip
-  description = "IP público da instância EC2"
+  value = aws_instance.lab_ec2.public_ip
 }
 
-output "ec2_public_dns" {
-  value       = aws_instance.lab_ec2.public_dns
-  description = "DNS público da instância EC2"
+output "ssh_connection_command" {
+  value = "ssh -i key.pem ec2-user@${aws_instance.lab_ec2.public_ip}"
 }
