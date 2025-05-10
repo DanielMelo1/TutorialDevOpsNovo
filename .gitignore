@@ -1,0 +1,25 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+
+# Variáveis sensíveis
+*.tfvars
+!terraform.tfvars.example
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+
+# Credenciais
+*.pem
+*.key
+.env
