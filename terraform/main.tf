@@ -209,10 +209,13 @@ resource "aws_instance" "lab_ec2" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
   key_name               = "key"  # Sua chave existente sem .pem
   
-  # User data para Amazon Linux 2023
+  # User data para Amazon Linux 2023 com Instance Connect
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
+              
+              # Instalar EC2 Instance Connect para funcionar no console AWS
+              dnf install -y ec2-instance-connect
               
               # No Amazon Linux 2023, nodejs está disponível direto
               dnf install -y nodejs
@@ -229,11 +232,16 @@ resource "aws_instance" "lab_ec2" {
               wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
               chmod +x ./install
               ./install auto
+              systemctl enable codedeploy-agent
+              systemctl start codedeploy-agent
               
               # Confirmar instalações no log
+              echo "=== LOG DE INSTALAÇÃO ===" >> /var/log/user-data.log
               echo "Instalações completadas em $(date)" >> /var/log/user-data.log
               echo "Node version: $(node --version)" >> /var/log/user-data.log
+              echo "EC2 Instance Connect: $(dnf list installed | grep ec2-instance-connect)" >> /var/log/user-data.log
               echo "CodeDeploy agent status: $(systemctl status codedeploy-agent --no-pager)" >> /var/log/user-data.log
+              echo "=========================" >> /var/log/user-data.log
               EOF
 
   tags = {
