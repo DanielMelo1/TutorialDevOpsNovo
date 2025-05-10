@@ -150,14 +150,14 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-# Buscar a AMI do Amazon Linux 2 mais recente
-data "aws_ami" "amazon_linux_2" {
+# Buscar a AMI do Amazon Linux 2023 mais recente
+data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-*-x86_64"]
   }
 
   filter {
@@ -168,18 +168,16 @@ data "aws_ami" "amazon_linux_2" {
 
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
-  ami                    = data.aws_ami.amazon_linux_2.id
+  ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   
-  # User data para instalar um servidor web básico e Node.js
+  # User data para Amazon Linux 2023
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              # Não usar amazon-linux-extras porque nodejs não está mais disponível
-              # Usar NodeSource Repository
-              curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+              # No Amazon Linux 2023, nodejs está no repositório principal
               yum install -y nodejs
               # Instalar Apache
               yum install -y httpd
