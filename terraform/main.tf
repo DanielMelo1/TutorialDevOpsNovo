@@ -166,24 +166,73 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
+# IAM Role para CodeDeploy (se necessário)
+resource "aws_iam_role" "ec2_codedeploy_role" {
+  name = "EC2CodeDeployRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "EC2CodeDeployRole"
+  }
+}
+
+# Política para acessar S3 (necessário para CodeDeploy)
+resource "aws_iam_role_policy_attachment" "s3_readonly_policy" {
+  role       = aws_iam_role.ec2_codedeploy_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+}
+
+# Instance Profile
+resource "aws_iam_instance_profile" "ec2_codedeploy_profile" {
+  name = "EC2CodeDeployProfile"
+  role = aws_iam_role.ec2_codedeploy_role.name
+}
+
 # Instância EC2 na sub-rede pública 2 (us-east-1b)
 resource "aws_instance" "lab_ec2" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
   
   # User data para Amazon Linux 2023
   user_data = <<-EOF
               #!/bin/bash
-              yum update -y
-              # No Amazon Linux 2023, nodejs está no repositório principal
-              yum install -y nodejs
+              dnf update -y
+              
+              # No Amazon Linux 2023, nodejs está disponível direto
+              dnf install -y nodejs
+              
               # Instalar Apache
-              yum install -y httpd
+              dnf install -y httpd
               systemctl start httpd
               systemctl enable httpd
               echo "<h1>Hello from EC2 in lab-vpc! Node: $(node --version)</h1>" > /var/www/html/index.html
+              
+              # Instalar CodeDeploy Agent
+              dnf install -y ruby wget
+              cd /home/ec2-user
+              wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
+              chmod +x ./install
+              ./install auto
+              
+              # Confirmar instalações no log
+              echo "Instalações completadas:" >> /var/log/user-data.log
+              echo "Node version: $(node --version)" >> /var/log/user-data.log
+              echo "CodeDeploy agent status: $(systemctl status codedeploy-agent --no-pager)" >> /var/log/user-data.log
               EOF
 
   tags = {
