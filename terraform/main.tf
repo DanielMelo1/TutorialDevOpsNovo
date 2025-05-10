@@ -173,10 +173,13 @@ resource "aws_instance" "lab_ec2" {
   subnet_id              = aws_subnet.public_2.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   
-  # User data para instalar um servidor web básico
+  # User data para instalar um servidor web básico e preparar o ambiente
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
+              # Habilitar o repositório nodejs via amazon-linux-extras
+              amazon-linux-extras install nodejs14 -y 
+              # Instalar Apache
               yum install -y httpd
               systemctl start httpd
               systemctl enable httpd
