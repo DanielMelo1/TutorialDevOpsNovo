@@ -219,7 +219,7 @@ resource "aws_instance" "lab_ec2" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy_profile.name
   key_name               = "key"  # Sua chave existente
   
-  # User data SEM Node.js - para instalação manual
+  # User data MÍNIMO - apenas Instance Connect e Apache
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
@@ -229,28 +229,19 @@ resource "aws_instance" "lab_ec2" {
               systemctl enable ec2-instance-connect
               systemctl start ec2-instance-connect
               
-              # Instalar Apache
+              # Instalar Apache apenas
               dnf install -y httpd
               systemctl start httpd
               systemctl enable httpd
               echo "<h1>Hello from EC2 in lab-vpc!</h1>" > /var/www/html/index.html
               
-              # Instalar apenas as dependências do CodeDeploy
-              dnf install -y ruby wget
-              cd /home/ec2-user
-              wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
-              chmod +x ./install
-              ./install auto
-              systemctl enable codedeploy-agent
-              systemctl start codedeploy-agent
-              
-              # Log sem Node.js
+              # Log básico
               echo "=== LOG DE INSTALAÇÃO ===" >> /var/log/user-data.log
               echo "Data e hora: $(date)" >> /var/log/user-data.log
               echo "Instance Connect: INSTALADO" >> /var/log/user-data.log
               echo "Apache: $(systemctl is-active httpd)" >> /var/log/user-data.log
-              echo "CodeDeploy agent: $(systemctl is-active codedeploy-agent)" >> /var/log/user-data.log
               echo "Node.js: NÃO INSTALADO - para instalação manual" >> /var/log/user-data.log
+              echo "CodeDeploy: NÃO INSTALADO - para instalação manual" >> /var/log/user-data.log
               echo "=========================" >> /var/log/user-data.log
               EOF
 
